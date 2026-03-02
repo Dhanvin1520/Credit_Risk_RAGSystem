@@ -11,7 +11,7 @@
 \usepackage{enumitem}
 \usepackage{caption}
 \usepackage{listings}
-\usepackage{xcolor}
+\usepackage[table]{xcolor}
 \usepackage{fancyhdr}
 \usepackage{setspace}
 
@@ -71,14 +71,13 @@
 
 \end{titlepage}
 
-% ---- Abstract ----
+% ---- Abstract & Table of Contents ----
 \newpage
 \begin{abstract}
 Loan defaults are a significant financial risk for lending institutions. In this project, we built an end-to-end machine learning system to predict whether a loan applicant is likely to default. We used a Kaggle dataset of 45,000 loan records with 13 features and trained three classification models: Logistic Regression (baseline), Decision Tree (intermediate), and XGBoost (advanced). After handling class imbalance and tuning hyperparameters, XGBoost achieved the best performance with 91.27\% accuracy, 0.82 F1-Score, and 0.98 ROC-AUC. The system was deployed as a Streamlit web application that allows users to input applicant profiles and receive real-time default probability predictions with risk classification.
 \end{abstract}
 
-% ---- Table of Contents ----
-\newpage
+\vspace{1cm}
 \tableofcontents
 \newpage
 
@@ -130,30 +129,30 @@ The dataset is \textbf{imbalanced}: 35,000 records (78\%) are No Default and 10,
 % ===================================================================
 \section{Exploratory Data Analysis (EDA)}
 
-We performed EDA in \texttt{preprocessing.ipynb} to understand the data before modelling.
+We performed thorough Exploratory Data Analysis (EDA) in \texttt{preprocessing.ipynb} to understand the underlying distributions and relationships in the dataset prior to modelling. Our analysis included visualising data distributions with histograms and box plots, as well as examining feature interactions through a correlation matrix heatmap.
 
-\textbf{Missing Values:} Dropped rows with nulls using \texttt{df.dropna()}.
+\textbf{Missing Values:} We identified missing values in numerical columns and opted to drop rows with nulls using \texttt{df.dropna()} to ensure data integrity without introducing bias from imputation.
 
-\textbf{Outliers:} Capped extreme values at the 99th percentile for \texttt{person\_age}, \texttt{person\_income}, and \texttt{person\_emp\_exp} using \texttt{df['column'].quantile(0.99)}.
+\textbf{Outliers:} We observed significant rightward skewness in several financial features. We capped extreme values at the 99th percentile for \texttt{person\_age}, \texttt{person\_income}, and \texttt{person\_emp\_exp} using \texttt{df['column'].quantile(0.99)}, standardising the scale for our models.
 
 \textbf{Key Findings from Correlation Analysis:}
 \begin{itemize}[leftmargin=2cm]
-  \item \texttt{loan\_percent\_income} had the highest positive correlation with default.
-  \item \texttt{previous\_loan\_defaults\_on\_file} was strongly correlated --- past defaulters default again.
-  \item \texttt{credit\_score} and \texttt{person\_income} had negative correlations --- higher values mean lower risk.
+  \item \texttt{loan\_percent\_income} had the highest positive correlation with default, indicating applicants borrowing a large portion of their income are highly risky.
+  \item \texttt{previous\_loan\_defaults\_on\_file} was strongly correlated --- past defaulters have a significantly higher propensity to default again.
+  \item \texttt{credit\_score} and \texttt{person\_income} had strong negative correlations --- predictably, higher values correspond to lower risk.
 \end{itemize}
 
 % ===================================================================
 \section{Data Preprocessing}
 
-All preprocessing is in \texttt{preprocessing.py}:
+Robust data preprocessing is essential for training accurate and generalisable models. All preprocessing steps are encapsulated in our \texttt{preprocessing.py} script:
 
 \begin{enumerate}[leftmargin=2cm]
-  \item \textbf{Cleaning}: Drop nulls, cap outliers at 99th percentile, binary-encode gender (male=1, female=0) and previous defaults (Yes=1, No=0).
-  \item \textbf{Ordinal Encoding}: Education mapped to 0--4 (High School < Associate < Bachelor < Master < Doctorate).
-  \item \textbf{One-Hot Encoding}: \texttt{person\_home\_ownership} and \texttt{loan\_intent} via \texttt{pd.get\_dummies(drop\_first=True)}.
-  \item \textbf{Train-Test Split}: 80/20 split with \texttt{random\_state=42} for reproducibility.
-  \item \textbf{Feature Scaling}: \texttt{StandardScaler} applied only for Logistic Regression (tree-based models do not need scaling).
+  \item \textbf{Cleaning}: Dropped nulls to maintain pristine data quality, capped outliers at the 99th percentile to prevent models from learning anomalous financial extremities, and binary-encoded gender (male=1, female=0) and previous defaults (Yes=1, No=0).
+  \item \textbf{Ordinal Encoding}: Education mapped to a distinct 0--4 scale (High School < Associate < Bachelor < Master < Doctorate) to preserve the implicit hierarchy of qualifications.
+  \item \textbf{One-Hot Encoding}: Nominal categorical variables such as \texttt{person\_home\_ownership} and \texttt{loan\_intent} were transformed into sparse matrices via \texttt{pd.get\_dummies(drop\_first=True)}, avoiding the dummy variable trap.
+  \item \textbf{Train-Test Split}: We partitioned the data using an 80/20 split with \texttt{random\_state=42}, ensuring a robust test set for realistic evaluation metrics.
+  \item \textbf{Feature Scaling}: \texttt{StandardScaler} was applied exclusively for Logistic Regression to converge faster, whereas tree-based models were trained on unscaled data since they rely on value splitting rather than distance metrics.
 \end{enumerate}
 
 % ===================================================================
@@ -163,15 +162,33 @@ We trained three classification models, progressing from simple to advanced:
 
 \subsection{Logistic Regression (Baseline)}
 
-A linear model using the sigmoid function to output default probability \cite{sklearn}. Configured with \texttt{max\_iter=1000}, \texttt{class\_weight='balanced'}, and \texttt{StandardScaler}. Chosen as our baseline because it is fast, interpretable, and gives us a reference point.
+A linear model using the sigmoid function to output default probability \cite{sklearn}. The predicted probability is:
+
+\begin{equation}
+P(y=1 \mid x) = \sigma(w^T x + b) = \frac{1}{1 + e^{-(w^T x + b)}}
+\end{equation}
+
+Configured with \texttt{max\_iter=1000}, \texttt{class\_weight='balanced'}, and \texttt{StandardScaler}. Chosen as our baseline because it is fast, interpretable, and gives us a reference point.
 
 \subsection{Decision Tree (Intermediate)}
 
-A non-linear model that splits data at feature thresholds to create a tree of decisions \cite{sklearn}. Configured with \texttt{max\_depth=8}, \texttt{min\_samples\_leaf=10}, and \texttt{class\_weight='balanced'}. Chosen because it captures feature interactions that logistic regression cannot.
+A non-linear model that splits data at feature thresholds using Gini Impurity \cite{sklearn}:
+
+\begin{equation}
+Gini = 1 - \sum_{i=1}^{C} p_i^2
+\end{equation}
+
+where $p_i$ is the proportion of class $i$ in a node. Configured with \texttt{max\_depth=8}, \texttt{min\_samples\_leaf=10}, and \texttt{class\_weight='balanced'}. Chosen because it captures feature interactions that logistic regression cannot.
 
 \subsection{XGBoost (Best Model)}
 
-A gradient boosting algorithm that builds 200 trees sequentially, each correcting errors of the previous ones \cite{xgboost}. Key parameters:
+A gradient boosting algorithm that builds trees sequentially, each minimising the objective function \cite{xgboost}:
+
+\begin{equation}
+\mathcal{L} = \sum_{i=1}^{n} l(y_i, \hat{y}_i) + \sum_{k=1}^{K} \Omega(f_k)
+\end{equation}
+
+where $l$ is the log-loss function and $\Omega$ is the regularisation term that prevents overfitting. Key parameters:
 
 \begin{itemize}[leftmargin=2cm]
   \item \texttt{n\_estimators=200}, \texttt{max\_depth=8}, \texttt{learning\_rate=0.05}
@@ -184,19 +201,30 @@ Chosen because XGBoost is the best-performing algorithm for structured/tabular d
 % ===================================================================
 \section{Results}
 
-All models were evaluated on the \textbf{test set} (20\% unseen data) using Accuracy, F1-Score, and ROC-AUC.
+All models were evaluated on the \textbf{test set} (20\% unseen data) using the following metrics:
+
+\begin{equation}
+\text{Accuracy} = \frac{TP + TN}{TP + TN + FP + FN}
+\end{equation}
+
+\begin{equation}
+\text{F1-Score} = 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}
+\end{equation}
+
+\textbf{ROC-AUC} measures the area under the Receiver Operating Characteristic curve --- a value of 1.0 means perfect classification.
 
 \begin{table}[H]
   \centering
   \caption{Model Comparison on Test Set}
   \label{tab:results}
+  \renewcommand{\arraystretch}{1.5}
   \begin{tabular}{l c c c}
     \toprule
-    \textbf{Model} & \textbf{Accuracy (\%)} & \textbf{F1-Score} & \textbf{ROC-AUC} \\
+    \rowcolor{blue!20} \textbf{Model} & \textbf{Accuracy (\%)} & \textbf{F1-Score} & \textbf{ROC-AUC} \\
     \midrule
     Logistic Regression & 85.25 & 0.7389 & 0.9523 \\
-    Decision Tree       & 88.03 & 0.7714 & 0.9627 \\
-    \textbf{XGBoost}    & \textbf{91.27} & \textbf{0.8239} & \textbf{0.9763} \\
+    \rowcolor{gray!10} Decision Tree       & 88.03 & 0.7714 & 0.9627 \\
+    \rowcolor{green!20} \textbf{XGBoost}    & \textbf{91.27} & \textbf{0.8239} & \textbf{0.9763} \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -260,8 +288,8 @@ We built a web application using Streamlit \cite{streamlit} with the following f
     \toprule
     \textbf{Team Member} & \textbf{Contribution} \\
     \midrule
-    \textbf{Dhanvin Vadlamudi} (Lead)
-      & Overall project architecture and planning. Built the XGBoost model and tuned its hyperparameters. Wrote the preprocessing pipeline (\texttt{preprocessing.py}). Managed the repository and coordinated team tasks. \\
+    \textbf{Dhanvin Vadlamudi} (Team Lead)
+  & Led the overall project architecture, technical direction, and planning. Designed and implemented the XGBoost model, including systematic hyperparameter tuning and performance optimization. Developed the end-to-end preprocessing pipeline. Structured the repository, established coding standards, and coordinated team tasks to ensure timely delivery and smooth integration. \\
     \addlinespace
     \textbf{Meka Chaitanya Sai}
       & Built the Decision Tree model. Experimented with different hyperparameters (\texttt{max\_depth}, \texttt{min\_samples\_leaf}). Assisted with feature encoding. \\
@@ -291,25 +319,17 @@ Key takeaways:
 % ===================================================================
 \begin{thebibliography}{9}
 
+\bibitem{hosted_app}
+Streamlit Hosted Application, ``Loan Default Prediction Dashboard.'' \\
+\url{https://genaicapstone-m8ezlrzqqq8ctmmfgsh6ur.streamlit.app/}
+
 \bibitem{kaggle_dataset}
-Tawei Lo, ``Loan Approval Classification Data,'' Kaggle, 2024. \\
+Kaggle Dataset, ``Loan Approval Classification Data.'' \\
 \url{https://www.kaggle.com/datasets/taweilo/loan-approval-classification-data}
 
-\bibitem{sklearn}
-F. Pedregosa et al., ``Scikit-learn: Machine Learning in Python,'' \textit{Journal of Machine Learning Research}, vol. 12, pp. 2825--2830, 2011. \\
-\url{https://scikit-learn.org/stable/}
-
-\bibitem{xgboost}
-T. Chen and C. Guestrin, ``XGBoost: A Scalable Tree Boosting System,'' in \textit{Proceedings of the 22nd ACM SIGKDD}, 2016. \\
-\url{https://xgboost.readthedocs.io/}
-
-\bibitem{streamlit}
-Streamlit Inc., ``Streamlit --- The fastest way to build data apps,'' 2024. \\
-\url{https://docs.streamlit.io/}
-
-\bibitem{pandas}
-W. McKinney, ``Data Structures for Statistical Computing in Python,'' in \textit{Proceedings of the 9th Python in Science Conference}, 2010. \\
-\url{https://pandas.pydata.org/}
+\bibitem{github_repo}
+GitHub Repository, ``GenAI Capstone Source Code.'' \\
+\url{https://github.com/ChaitanyaSai-Meka/gen_ai_capstone}
 
 \end{thebibliography}
 
