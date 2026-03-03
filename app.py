@@ -498,6 +498,7 @@ def main():
         
     elif page == "Report":
         st.title("Project Report")
+        st.link_button("📂 View Report on Google Drive", "https://drive.google.com/file/d/1bKLeRReufK8u5oOO0q1BsBgFlvWmdSO2/view?usp=sharing", use_container_width=True)
         st.markdown("Below is the formal project report detailing our approach and methodology.")
         
         import os
