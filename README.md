@@ -93,6 +93,17 @@ gen_ai_capstone/
 
 ---
 
+## 🛡️ Responsible AI & Ethical Framework
+
+To ensure 100% compliance with financial regulations (RBI/Basel III) and ethical standards, this system implements several "Guardrail" strategies:
+
+- **Bias Mitigation:** Our LLM system prompt explicitly forbids the use of protected attributes (Gender, Religion, Caste, etc.) in the final lending decision. Decisions are grounded **solely** on objective financial metrics.
+- **Regulatory Grounding (RAG):** Every decision is cross-referenced with local and international norms retrieved via our FAISS vector store, preventing "black box" decision making.
+- **Transparency:** The system provides a clear "Decision Rationale" for every borrower, explaining *why* a specific classification was reached.
+- **Human-in-the-loop:** The system is designed as a **Decision Support** tool, meaning all AI outputs are presented with a clear legal disclaimer for final review by a bank officer.
+
+---
+
 ## 🚀 Setup & Installation
 
 1. **Clone & Install:**

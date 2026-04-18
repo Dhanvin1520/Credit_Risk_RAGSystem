@@ -408,7 +408,7 @@ def _render_home_page():
 
     st.markdown("---")
     st.subheader("System Architecture Overview")
-    st.image("assets/architecture_diagram.png", use_container_width=True)
+    st.image("assets/milestone2_architecture_detailed.png", use_container_width=True)
 
 
 def _render_agent_page():
@@ -779,7 +779,7 @@ def _render_architecture_page():
     )
 
     st.markdown("---")
-    st.image("assets/architecture_diagram.png", use_container_width=True, caption="End-to-End System Architecture")
+    st.image("assets/milestone2_architecture_detailed.png", use_container_width=True, caption="Detailed End-to-End System Architecture")
 
 
 def _render_report_page():
