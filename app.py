@@ -69,6 +69,11 @@ accuracies = [acc_lr * 100, acc_dt * 100, acc_xgb * 100]
 best_idx = accuracies.index(max(accuracies))
 
 
+def nav_to(page_name):
+    st.session_state.active_page = page_name
+    st.session_state.nav_radio = page_name
+
+
 def main():
     st.sidebar.markdown(
         """
@@ -106,28 +111,38 @@ def main():
             margin: 0;
             text-align: center;
         }
-        [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(2) {
-            border-color: #3B82F6 !important;
-            background: linear-gradient(to right, #EFF6FF, #FFFFFF) !important;
-            border-width: 2px !important;
-        }
-        [data-testid="stSidebar"] div[role="radiogroup"] > label:nth-child(2) p::after {
-            content: " ✨ NEW";
-            font-size: 10px;
-            color: #1E40AF;
-            vertical-align: super;
         }
         </style>
         """,
         unsafe_allow_html=True
     )
 
-    st.sidebar.markdown('<div class="sidebar-title">Credit Risk AI</div>', unsafe_allow_html=True)
+    if 'active_page' not in st.session_state:
+        st.session_state.active_page = "Home"
+
+    nav_options = [
+        "Home", 
+        "Milestone 1 - ML Models", 
+        "Milestone 2 - AI Agent", 
+        "Dataset", 
+        "Architecture", 
+        "Report"
+    ]
+    
+    # Calculate index based on session state
+    try:
+        current_idx = nav_options.index(st.session_state.active_page)
+    except:
+        current_idx = 0
+
     page = st.sidebar.radio(
         "Go to:",
-        ["Home", "AI Lending Agent", "Dataset", "Model Comparison", "Architecture", "Report"],
-        label_visibility="collapsed"
+        nav_options,
+        index=current_idx,
+        label_visibility="collapsed",
+        key="nav_radio"
     )
+    st.session_state.active_page = page
 
     st.sidebar.markdown("<br>", unsafe_allow_html=True)
     st.sidebar.header("Configuration")
@@ -157,11 +172,12 @@ def main():
         y_pred_sel = model.predict(X_test)
     sel_f1 = f1_score(y_test, y_pred_sel)
 
-    st.sidebar.header("Model Performance")
-    st.sidebar.info("Active Model: " + selected_model_name)
-    st.sidebar.metric("Test Accuracy", str(round(sel_acc * 100, 2)) + "%")
-    st.sidebar.metric("F1-Score", str(round(sel_f1, 4)))
-    st.sidebar.metric("ROC AUC Score", str(round(sel_auc, 4)))
+    st.sidebar.header("System Status")
+    from agent.nodes import _get_api_key
+    if _get_api_key():
+        st.sidebar.success("AI Engine: Ready")
+    else:
+        st.sidebar.warning("AI Engine: GROQ_API_KEY Missing")
 
     st.sidebar.markdown("---")
     st.sidebar.header("About This Model")
@@ -175,14 +191,14 @@ def main():
     if page == "Home":
         _render_home_page()
 
-    elif page == "AI Lending Agent":
+    elif page == "Milestone 1 - ML Models":
+        _render_ml_prediction_page()
+
+    elif page == "Milestone 2 - AI Agent":
         _render_agent_page()
 
     elif page == "Dataset":
         _render_dataset_page()
-
-    elif page == "Model Comparison":
-        _render_model_comparison_page()
 
     elif page == "Architecture":
         _render_architecture_page()
@@ -192,23 +208,54 @@ def main():
 
 
 def _render_home_page():
-    st.title("Loan Default Prediction System")
+    st.title("Intelligent Credit Risk Assessment Portal")
+    
+    st.markdown("### Problem Statement")
     st.write(
-        "Banks lose money when borrowers fail to repay loans. This system uses machine learning "
-        "to predict default probability based on applicant profiles, classifying them into "
-        "Low, Medium, and High risk categories."
+        "Financial institutions face significant risk when borrowers fail to repay loans. "
+        "Traditional credit scoring models often act as 'black boxes', providing a numerical score "
+        "without explaining the regulatory rationale or qualitative nuances of a borrower's profile. "
+        "This project aims to bridge the gap between predictive statistical modeling and autonomous "
+        "agentic reasoning for transparent lending support."
     )
     
+    st.markdown("---")
+    
+    # Milestone 1 Section
     st.markdown("""
-    <div style="background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); padding: 1.5rem; border-radius: 12px; color: white; margin: 1rem 0;">
-        <h3 style="color: white; margin-top: 0;">✨ New: AI Lending Agent Support</h3>
-        <p style="color: #BFDBFE; margin-bottom: 1rem;">Move beyond raw probability to <b>Agentic Reasoning</b>. Our new AI Agent interprets ML scores alongside RBI & Basel III regulations to provide human-style lending assessments.</p>
-        <p style="font-size: 0.9rem; font-weight: 600;">Go to "AI Lending Agent" in the sidebar to try it now!</p>
+    <div style="background: white; padding: 1.5rem; border-radius: 12px; border: 1px solid #E5E7EB; margin-bottom: 1rem;">
+        <h3 style="color: #1E3A8A; margin-top: 0;">Milestone 1: Classic ML Prediction</h3>
+        <p style="color: #4B5563;">Implementation of high-performance predictive models (XGBoost, Decision Trees) trained on 45,000+ historical records. This phase focuses on the statistical probability of default with 91.2% accuracy.</p>
     </div>
     """, unsafe_allow_html=True)
+    if st.button("Open Milestone 1 Prediction Page", use_container_width=True, type="secondary", on_click=nav_to, args=("Milestone 1 - ML Models",)):
+        pass
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Milestone 2 Section
+    st.markdown("""
+    <div style="background: linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%); padding: 1.5rem; border-radius: 12px; color: white; margin-bottom: 1rem;">
+        <h3 style="color: white; margin-top: 0;">Milestone 2: Agentic AI Decision Support</h3>
+        <p style="color: #BFDBFE;">An evolution into agentic workflows using LangGraph and FAISS RAG. This phase enables the system to reason about borrower profiles, retrieve banking regulations (RBI/Basel III), and generate structured assessments.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    if st.button("Open Milestone 2 Agent Page", use_container_width=True, type="primary", on_click=nav_to, args=("Milestone 2 - AI Agent",)):
+        pass
+
+    st.markdown("---")
+    st.subheader("Combined Architecture Overview")
+    st.image("assets/milestone2_architecture_detailed.png", use_container_width=True)
+
+
+def _render_ml_prediction_page():
+    st.title("Classic ML Prediction (Milestone 1)")
+    st.write(
+        "Interact with our high-performance predictive models to assess numerical default risk."
+    )
     
     st.markdown("---")
-    st.subheader("Model Comparison Summary")
+    st.subheader("Model Benchmark Gallery")
 
     col_bar, col_roc = st.columns(2)
 
@@ -227,7 +274,6 @@ def _render_home_page():
         ax1.grid(axis='y', linestyle='--', alpha=0.4)
         plt.tight_layout()
         st.pyplot(fig1)
-        st.caption("Metric: **Accuracy** — percentage of correct predictions on test data.")
 
     with col_roc:
         prob_lr = get_proba(lr_model, lr_X_test, lr_scaler)
@@ -254,52 +300,6 @@ def _render_home_page():
         ax2.grid(True, linestyle='--', alpha=0.4)
         plt.tight_layout()
         st.pyplot(fig2)
-        st.caption("Metric: **ROC AUC** — measures how well the model separates defaulters from non-defaulters.")
-
-    st.markdown("")
-    st.markdown("**Metrics**")
-
-    f1_lr = f1_score(lr_y_test, lr_model.predict(lr_scaler.transform(lr_X_test)))
-    f1_dt = f1_score(dt_y_test, dt_model.predict(dt_X_test))
-    f1_xgb = f1_score(xgb_y_test, xgb_model.predict(xgb_X_test))
-
-    prob_lr = get_proba(lr_model, lr_X_test, lr_scaler)
-    prob_dt = get_proba(dt_model, dt_X_test)
-    prob_xgb = get_proba(xgb_model, xgb_X_test)
-
-    auc_lr = roc_auc_score(lr_y_test, prob_lr)
-    auc_dt = roc_auc_score(dt_y_test, prob_dt)
-    auc_xgb = roc_auc_score(xgb_y_test, prob_xgb)
-
-    metrics_df = pd.DataFrame({
-        "Model": model_names,
-        "Accuracy (%)": accuracies,
-        "F1-Score": [f1_lr, f1_dt, f1_xgb],
-        "ROC AUC": [auc_lr, auc_dt, auc_xgb],
-    })
-
-    def highlight_rows(row):
-        if row.name == len(metrics_df) - 1:
-            return ['background-color: #E0E7FF; color: black'] * len(row)
-        return [''] * len(row)
-
-    styled_df = (
-        metrics_df.style
-        .apply(highlight_rows, axis=1)
-        .set_table_styles([
-            {'selector': 'th', 'props': [('background-color', '#1E3A8A'), ('color', 'white')]}
-        ])
-        .format({
-            "Accuracy (%)": "{:.2f}",
-            "F1-Score": "{:.4f}",
-            "ROC AUC": "{:.4f}"
-        })
-    )
-
-    try:
-        st.dataframe(styled_df, use_container_width=True, hide_index=True)
-    except TypeError:
-        st.dataframe(styled_df, use_container_width=True)
 
     st.markdown("---")
     st.subheader("Predict Default Risk")
@@ -344,20 +344,10 @@ def _render_home_page():
                 credit_score = st.number_input("Credit Score", min_value=300, max_value=850, value=650)
                 prev_defaults = st.selectbox("Previous Defaults", ["No", "Yes"])
 
-            submit = st.form_submit_button("Predict", use_container_width=True, type="primary")
+            submit = st.form_submit_button("Predict Result", use_container_width=True, type="primary", key="m1_predict_btn")
 
     with col_result:
-        st.markdown("**Result**")
-
-        with st.expander("What is Default Probability?"):
-            st.write("""
-            **Default Probability** is the chance that a borrower will not repay their loan.
-
-            Our models analyze the applicant's profile and estimate this probability:
-            - **Low Risk** (below 40%): Applicant is likely to repay.
-            - **Medium Risk** (40% to 60%): Needs closer review.
-            - **High Risk** (above 60%): Applicant may not repay.
-            """)
+        st.markdown("**Assessment Result**")
 
         if submit:
             loan_to_income = loan_amnt / max(1, income)
@@ -397,38 +387,13 @@ def _render_home_page():
             st.metric("Default Probability", f'{prob * 100:.1f}%')
 
             if prob >= 0.60:
-                st.error("HIGH RISK — Review carefully or decline.")
+                st.error("HIGH RISK")
             elif prob >= 0.40:
-                st.warning("MEDIUM RISK — Needs manual review.")
+                st.warning("MEDIUM RISK")
             else:
-                st.success("LOW RISK — Can be approved.")
-
-            st.markdown("---")
-            st.markdown("**Top Factors Affecting Prediction:**")
-
-            if predict_model_name == "Logistic Regression":
-                coefficients = model.coef_[0]
-                feature_importance = sorted(
-                    zip(feature_names, coefficients), key=lambda x: abs(x[1]), reverse=True
-                )
-                for i, (fname, coef) in enumerate(feature_importance[:5]):
-                    clean = fname.replace("person_", "").replace("loan_", "").replace("_", " ").title()
-                    direction = "Increases Risk" if coef > 0 else "Decreases Risk"
-                    st.write(f"{i+1}. **{clean}** — {direction}")
-            else:
-                importances = model.feature_importances_
-                feature_importance = sorted(
-                    zip(feature_names, importances), key=lambda x: x[1], reverse=True
-                )
-                for i, (fname, imp) in enumerate(feature_importance[:5]):
-                    clean = fname.replace("person_", "").replace("loan_", "").replace("_", " ").title()
-                    st.write(f"{i+1}. **{clean}** — Importance: {imp:.3f}")
+                st.success("LOW RISK")
         else:
-            st.info("Fill in the form and click Predict.")
-
-    st.markdown("---")
-    st.subheader("System Architecture Overview")
-    st.image("assets/milestone2_architecture_detailed.png", use_container_width=True)
+            st.info("Fill the form to compute risk.")
 
 
 def _render_agent_page():
@@ -502,6 +467,58 @@ def _render_agent_page():
     regulatory guidelines (RBI, Basel III, CIBIL), and generates a structured credit assessment report.
     """)
 
+    # LangGraph Workflow Visualization
+    with st.expander("Explore LangGraph Orchestration Logic", expanded=True):
+        st.markdown("#### Agentic State Machine")
+        st.write(
+            "The system is orchestrated using a stateful directed graph. Unlike a simple text-in-text-out LLM, "
+            "this agent transitions through specific logic nodes while maintaining a persistent 'AgentState'."
+        )
+        
+        col_wf1, col_wf2, col_wf3, col_wf4, col_wf5 = st.columns(5)
+        
+        with col_wf1:
+            st.markdown("""
+            <div style="background: #F1F5F9; border: 1px solid #CBD5E1; padding: 10px; border-radius: 8px; text-align: center; height: 160px;">
+                <b style="color: #1E3A8A;">1. Parse</b><br>
+                <small>Sanitizes input & standardizes profile metrics</small>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col_wf2:
+            st.markdown("""
+            <div style="background: #F1F5F9; border: 1px solid #CBD5E1; padding: 10px; border-radius: 8px; text-align: center; height: 160px;">
+                <b style="color: #1E3A8A;">2. ML Score</b><br>
+                <small>Executes XGBoost M1 prediction engine</small>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col_wf3:
+            st.markdown("""
+            <div style="background: #F1F5F9; border: 1px solid #CBD5E1; padding: 10px; border-radius: 8px; text-align: center; height: 160px;">
+                <b style="color: #1E3A8A;">3. RAG</b><br>
+                <small>Retrieves regulatory context via FAISS</small>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col_wf4:
+            st.markdown("""
+            <div style="background: #F1F5F9; border: 1px solid #CBD5E1; padding: 10px; border-radius: 8px; text-align: center; height: 160px;">
+                <b style="color: #1E3A8A;">4. Reason</b><br>
+                <small>LLM synthesizes score + regulations</small>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col_wf5:
+            st.markdown("""
+            <div style="background: #F1F5F9; border: 1px solid #CBD5E1; padding: 10px; border-radius: 8px; text-align: center; height: 160px;">
+                <b style="color: #1E3A8A;">5. Format</b><br>
+                <small>Generates structured JSON credit report</small>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.info("Technical Detail: The agent uses **LangGraph's State Persistence** to ensure that data from late-stage nodes (like RAG) can be compared against early-stage nodes (like ML Scoring) for consistency.")
+
     st.markdown("---")
     st.subheader("Borrower Profile Input")
 
@@ -547,10 +564,16 @@ def _render_agent_page():
         generate = st.form_submit_button(
             "Generate AI Assessment Report",
             use_container_width=True,
-            type="primary"
+            type="primary",
+            key="m2_agent_btn"
         )
 
+    st.markdown("---")
+    st.subheader("Milestone 2 Architecture Overview")
+    st.image("assets/milestone2_architecture_detailed.png", use_container_width=True)
+
     if generate:
+        st.session_state.last_agent_run = None # Clear previous
         borrower_profile = {
             "age": age,
             "gender": gender,
@@ -566,10 +589,9 @@ def _render_agent_page():
             "previous_defaults": previous_defaults,
         }
 
-        with st.spinner("Running AI agent — analyzing profile, retrieving regulations, generating report…"):
+        with st.spinner("Running AI agent — analyzing profile, retrieving regulations, generating report..."):
             try:
                 agent_graph = get_agent_graph(lr_result, dt_result, xgb_result)
-
                 initial_state = {
                     "borrower_profile": borrower_profile,
                     "ml_scores": {},
@@ -578,15 +600,16 @@ def _render_agent_page():
                     "assessment_report": {},
                     "error": None,
                 }
-
-                final_state = agent_graph.invoke(initial_state)
-
+                st.session_state.last_agent_run = agent_graph.invoke(initial_state)
             except Exception as e:
-                st.error(f"Agent encountered an error: {e}")
+                st.error(f"Agent Execution Failed: {str(e)}")
                 return
 
+    if st.session_state.get("last_agent_run"):
+        final_state = st.session_state.last_agent_run
+        
         if final_state.get("error"):
-            st.error(f"Agent error: {final_state['error']}")
+            st.error(f"Agent Error: {final_state['error']}")
             return
 
         st.markdown("---")
