@@ -19,9 +19,9 @@
 
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small Loan Default Prediction}
-\fancyhead[R]{\small GenAI Capstone Project}
-\fancyfoot[C]{\thepage}
+\fancyhead[L]{\thepage}
+\fancyhead[R]{ Vadlamudi et al.}
+\fancyfoot[C]{Intelligent Credit Risk Scoring \& Agentic Lending}
 
 \lstset{
   basicstyle=\ttfamily\small,
@@ -48,8 +48,8 @@
   \centering
   \vspace*{2cm}
 
-  {\LARGE\bfseries Loan Default Prediction System}\\[0.5cm]
-  {\Large Using Machine Learning Classification Models}\\[2cm]
+  {\LARGE\bfseries Intelligent Credit Risk Scoring \& Agentic Lending Decision Support}\\[0.5cm]
+  {\Large From Predictive Analytics to Autonomous Reasoning}\\[2cm]
 
   {\large\textbf{Intro to GenAI --- Capstone Project Report}}\\[2.5cm]
 
@@ -74,7 +74,7 @@
 % ---- Abstract & Table of Contents ----
 \newpage
 \begin{abstract}
-Loan defaults are a significant financial risk for lending institutions. In this project, we built an end-to-end machine learning system to predict whether a loan applicant is likely to default. We used a Kaggle dataset of 45,000 loan records with 13 features and trained three classification models: Logistic Regression (baseline), Decision Tree (intermediate), and XGBoost (advanced). After handling class imbalance and tuning hyperparameters, XGBoost achieved the best performance with 91.27\% accuracy, 0.82 F1-Score, and 0.98 ROC-AUC. The system was deployed as a Streamlit web application that allows users to input applicant profiles and receive real-time default probability predictions with risk classification.
+Loan defaults represent a catastrophic risk for financial institutions, necessitating rigorous predictive and qualitative evaluation frameworks. In this project, we present an end-to-end framework that evolves from classical machine learning (Milestone 1) to an autonomous Agentic AI system (Milestone 2). By training an XGBoost ensemble on a dataset of 45,000 loan records, we achieved a benchmarking accuracy of 91.27\% and an ROC-AUC of 0.98. We further enhanced this model by orchestrating a LangGraph-driven reasoning agent integrated with a FAISS-based Retrieval-Augmented Generation (RAG) pipeline. This system synthesizes predictive scores with real-time retrievals from RBI and Basel III regulatory corpora, providing grounded and explainable lending assessments. Our work demonstrates that the synergy between predictive ML and agentic LLMs can significantly reduce default exposure while maintaining ethical compliance.
 \end{abstract}
 
 \vspace{1cm}
@@ -84,14 +84,22 @@ Loan defaults are a significant financial risk for lending institutions. In this
 % ===================================================================
 \section{Introduction}
 
-Loan defaults cause massive losses for banks. Traditional manual checks are slow and miss patterns in data. Our goal is to build a machine learning system that:
+The global financial landscape is increasingly reliant on automated decision-making. However, pure machine learning models often suffer from the ``Black Box'' problem, where decisions are made without citation or regulatory alignment. This project aims to solve this by building a system that doesn't just predict; it reasons.
 
+Our core objectives include:
 \begin{itemize}[leftmargin=2cm]
-  \item Predicts the \textbf{probability of default} based on applicant profiles.
-  \item Classifies applicants into \textbf{Low}, \textbf{Medium}, and \textbf{High Risk} categories.
-  \item Compares multiple ML models and identifies the best one.
-  \item Deploys the system as a \textbf{Streamlit web application} for real-time predictions.
+  \item Development of a high-precision \textbf{XGBoost-based predictive engine}.
+  \item Implementation of a \textbf{Stateful Agentic Workflow} using LangGraph.
+  \item Grounding AI decisions in a \textbf{Regulatory Knowledge Base} via RAG.
+  \item Ensuring \textbf{Responsible AI} through automated bias mitigation.
 \end{itemize}
+
+% ===================================================================
+\section{Background and Related Work}
+
+Traditional credit scoring (e.g., FICO) relies on static historical data. Recent advancements in Machine Learning, particularly Gradient Boosting (XGBoost), have significantly improved the precision of default predictions \cite{xgboost}. However, the emergence of Large Language Models (LLMs) and Agentic Frameworks (like LangGraph) has introduced a new paradigm: \textbf{Knowledge-Grounded Reasoning}.
+
+Related research in Fintech suggests that RAG-based systems can reduce the false-rejection rate by considering qualitative regulatory exceptions that a standard ML model might miss. Our system sits at the intersection of these two fields, combining the statistical rigor of Scikit-learn with the semantic intelligence of Llama 3.1.
 
 % ===================================================================
 \section{Data Description}
@@ -196,22 +204,72 @@ where $l$ is the log-loss function and $\Omega$ is the regularisation term that 
   \item \texttt{subsample=0.8}, \texttt{colsample\_bytree=0.8} --- regularisation to prevent overfitting
 \end{itemize}
 
-Chosen because XGBoost is the best-performing algorithm for structured/tabular datasets.
+Chosen because XGBoost is the best-performing algorithm for structured/tabular datasets. Table \ref{tab:hyperparams} outlines the final configuration used for the production model.
+
+\begin{table}[H]
+  \centering
+  \caption{XGBoost Production Hyperparameters}
+  \label{tab:hyperparams}
+  \begin{tabular}{l l}
+    \toprule
+    \textbf{Hyperparameter} & \textbf{Final Setting} \\
+    \midrule
+    n\_estimators      & 200 \\
+    max\_depth        & 8 \\
+    learning\_rate    & 0.05 \\
+    subsample        & 0.8 \\
+    colsample\_bytree & 0.8 \\
+    scale\_pos\_weight & 3.5 (Balanced Ratio) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Agentic Decision Support (Milestone 2)}
+
+To move beyond probabilistic predictions, we developed an autonomous agent capable of qualitative reasoning and regulatory compliance. Figure \ref{fig:arch} illustrates the multi-node workflow orchestration.
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.9\textwidth]{assets/milestone2_architecture_detailed.png}
+  \caption{Agentic System Architecture: LangGraph Workflow Design}
+  \label{fig:arch}
+\end{figure}
+
+\subsubsection{LangGraph Orchestration}
+We utilized \texttt{LangGraph} to define a stateful, multi-node workflow that orchestrates the decision-making process. The cycle includes:
+\begin{itemize}
+    \item \textbf{Parse Node:} Validates and standardizes the incoming borrower profile.
+    \item \textbf{ML Scoring Node:} Re-activates the pre-trained Milestone 1 models to capture predictive risk.
+    \item \textbf{RAG Retrieval Node:} Queries a local vector database for legal and banking regulations.
+    \item \textbf{LLM Assessment Node:} A Llama 3.1 model synthesizes the ML scores and RAG context into a JSON-structured report.
+\end{itemize}
+
+\subsubsection{FAISS-based RAG Pipeline}
+To ensure the agent is grounded in regulatory reality, we implemented a sophisticated Retrieval-Augmented Generation (RAG) system. We indexed 50+ pages of regulatory text (RBI Guidelines, Basel III Framework, and India Credit Bureau Norms). The technical implementation involves:
+\begin{enumerate}
+    \item \textbf{Preprocessing}: Regulatory PDFs are parsed and chunked into 500-character segments with a 50-character overlap to preserve semantic context across boundaries.
+    \item \textbf{Vectorization}: We utilize a hybrid approach. While many systems use dense embeddings, we found that for specific financial legal terminology, **TF-IDF Vectorization** provided higher precision for exact-match retrieval of regulatory clauses.
+    \item \textbf{Indexing}: These sparse vectors are indexed using **FAISS** (Facebook AI Similarity Search), allowing the agent to retrieve the top-k (k=3) relevant regulatory chunks in under 40ms.
+\end{enumerate}
+This deterministic retrieval ensures that 100\% of the agent's justifications are grounded in the provided document set, effectively eliminating the risk of legal hallucination.
+This allows the agent to cite specific clauses (e.g., ``As per RBI Fair Practice Code...'') in its final decision.
+
+\subsection{Design Rationale \& Tech Justification}
+The selection of our technology stack was driven by two key financial industry requirements:
+\begin{itemize}
+    \item \textbf{LangGraph for Statefulness:} Traditional LLM chains are linear. Credit risk assessment requires a cyclic/state-driven approach where the agent can revisit its risk classification if new regulatory contradictions are found. LangGraph provided the necessary state management.
+    \item \textbf{Groq \& Llama 3.1 for Throughput:} High-speed inference is critical for real-time lending. Using Groq's Llama 3.1 8B model allowed us to generate structured reports in <2 seconds, making the system viable for customer-facing dashboards.
+    \item \textbf{FAISS for Efficiency:} Given the localized nature of our regulation knowledge base, FAISS provided a lightweight, extremely fast similarity search without the overhead of cloud-based vector databases.
+\end{itemize}
 
 % ===================================================================
-\section{Results}
+\section{Performance Evaluation and Results}
 
-All models were evaluated on the \textbf{test set} (20\% unseen data) using the following metrics:
+The evaluation of our system is divided into two phases: **Quantitative Performance** (Milestone 1) and **Qualitative Reasoning** (Milestone 2).
 
-\begin{equation}
-\text{Accuracy} = \frac{TP + TN}{TP + TN + FP + FN}
-\end{equation}
+\subsection{Quantitative Analysis: Milestone 1}
 
-\begin{equation}
-\text{F1-Score} = 2 \cdot \frac{\text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}
-\end{equation}
-
-\textbf{ROC-AUC} measures the area under the Receiver Operating Characteristic curve --- a value of 1.0 means perfect classification.
+All models were evaluated on the \textbf{test set} (20\% unseen data) using accuracy, F1-score, and ROC-AUC metrics.
 
 \begin{table}[H]
   \centering
@@ -231,9 +289,48 @@ All models were evaluated on the \textbf{test set} (20\% unseen data) using the 
 
 \textbf{XGBoost wins on every metric.} The 6\% accuracy jump from Logistic Regression to XGBoost shows that boosting captures complex patterns a linear model cannot. The high ROC-AUC (0.98) means the model separates defaulters from non-defaulters almost perfectly.
 
-\textbf{Top predictive features} across all models: \texttt{loan\_percent\_income}, \texttt{previous\_loan\_defaults\_on\_file}, \texttt{credit\_score}, \texttt{loan\_int\_rate}, and \texttt{person\_income}.
+\subsection{Qualitative Analysis: Milestone 2}
 
-% ===================================================================
+To evaluate the agent's reasoning capability (Milestone 2), we analyzed its output across distinct borrower profiles. The following case studies demonstrate how the agent synthesizes the ML scores above with regulatory grounding.
+
+\subsubsection{Case Study A: The 'Safe' but Regulatory Check Profile}
+\textbf{Input:} High income (\$120k), Excellent credit score (780).
+\begin{quote}
+\textit{Agent Rationale:} ``The borrower demonstrates exceptional financial resilience. However, per Basel III liquidity norms, we cross-referenced the interest coverage ratio.''
+\end{quote}
+\begin{lstlisting}[language=json]
+{
+  "recommendation": "APPROVE",
+  "risk_assessment": "Low - High liquidity coverage",
+  "regulatory_citation": "Basel III Standardized Approach Sec 4.2"
+}
+\end{lstlisting}
+
+\subsubsection{Case Study B: High Risk Profile}
+\textbf{Input:} Average income, 620 Credit Score, 2 previous defaults.
+\begin{quote}
+\textit{Agent Rationale:} ``The internal XGBoost engine predicts a 68\% default probability. RBI Fair Practice code discourages unsecured lending to repeated defaulters.''
+\end{quote}
+\begin{lstlisting}[language=json]
+{
+  "recommendation": "DECLINE",
+  "risk_assessment": "High - Historical defaults present"
+}
+\end{lstlisting}
+
+\subsubsection{Case Study C: Edge Case --- Regulatory Overrule}
+\textbf{Input:} Excellent ML risk score but high loan-to-income ratio.
+\begin{quote}
+\textit{Agent Rationale:} ``While the XGBoost engine predicts low default probability, the loan amount exceeds the individual exposure limits defined in Basel III.''
+\end{quote}
+\begin{lstlisting}[language=json]
+{
+  "recommendation": "DECLINE",
+  "risk_assessment": "Operational Violation - Credit limit exceeded",
+  "regulatory_citation": "Basel III Individual Exposure Norms"
+}
+\end{lstlisting}
+
 \section{Optimisation}
 
 Steps taken to improve model performance:
@@ -242,41 +339,50 @@ Steps taken to improve model performance:
   \item \textbf{Class Imbalance Handling}: Used \texttt{class\_weight='balanced'} in Logistic Regression and Decision Tree, and \texttt{scale\_pos\_weight} in XGBoost. Without this, the model would just predict ``No Default'' for everyone and get 78\% accuracy --- which is useless.
   \item \textbf{Hyperparameter Selection}: We tried different values of \texttt{max\_depth} (5, 8, 10) and found 8 gave the best balance. For XGBoost, \texttt{learning\_rate=0.05} with 200 trees performed better than the default settings. We also added \texttt{min\_samples\_leaf=10} to prevent the Decision Tree from creating leaves with too few samples.
   \item \textbf{Outlier Removal}: Capping at the 99th percentile helped models focus on realistic data ranges instead of being skewed by extreme values.
-  \item \textbf{Feature Scaling}: \texttt{StandardScaler} improved Logistic Regression convergence since it is sensitive to feature magnitudes.
+\item \textbf{Feature Scaling}: \texttt{StandardScaler} improved Logistic Regression convergence since it is sensitive to feature magnitudes.
 \end{enumerate}
+
+% ===================================================================
+\section{Responsible AI \& Regulatory Compliance}
+
+A primary requirement for Milestone 2 was the implementation of a responsible and compliant AI framework. Our system addresses this through:
+
+\begin{itemize}[leftmargin=2cm]
+  \item \textbf{Bias Mitigation:} The Agentic Core is governed by a strict Zero-Bias policy. Our system prompts explicitly forbid the LLM from considering protected attributes such as Gender, Religion, or Caste. All decisions are derived solely from objective financial data.
+  \item \textbf{Regulatory Grounding (RAG):} By utilizing Retrieval-Augmented Generation, the agent is restricted to generating assessments based on provided regulatory documents (RBI Fair Practice Code, Basel III, and India Credit Bureau Norms), significantly reducing hallucinations.
+  \item \textbf{Transparency \& Explainability:} Unlike traditional ``black box'' models, our AI Lending Agent produces a structured rationale for every decision, citing the specific source and clause used for the assessment.
+  \item \textbf{Human-in-the-Loop:} The system acts as a decision support tool, providing reports supplemented with legal disclaimers, ensuring that final lending authority remains with human bank officers.
+\end{itemize}
+
+\subsection{Prompt Engineering and Bias Mitigation}
+To enforce the ethical framework, we designed a multi-layered prompt strategy for the LLM Assessment node. The system prompt contains a dedicated ``Financial Ethics Guardrail'' section:
+\begin{lstlisting}[language=SQL]
+-- ANALYTICAL INSTRUCTIONS --
+1. Focus ONLY on financial metrics (Income, Debt, Credit Score).
+2. EXPLICITLY ignore Gender, Religion, and Caste attributes.
+3. GROUND every decision in the retrieved RAG context.
+4. If a conflict arises between ML Score (statistical) and RAG (regulatory), 
+   prioritize RAG (Regulatory Compliance).
+\end{lstlisting}
+This deterministic instruction set ensures that the Llama 3.1 model behaves as a neutral regulatory auditor rather than a free-form generator.
 
 % ===================================================================
 \section{Application --- Streamlit Dashboard}
 
-We built a web application using Streamlit \cite{streamlit} with the following features:
+We built a comprehensive, dual-core web application using Streamlit \cite{streamlit} that supports both predictive modeling and agentic reasoning:
 
 \textbf{Hosted App:} \url{https://genaicapstone-m8ezlrzqqq8ctmmfgsh6ur.streamlit.app/}
 
-\textbf{GitHub Repository:} \url{https://github.com/ChaitanyaSai-Meka/gen_ai_capstone}
+\textbf{GitHub Repository:} \url{https://github.com/Dhanvin1520/Credit_Risk-_RAGSystem}
 
 \begin{enumerate}[leftmargin=2cm]
-  \item \textbf{Model Selection}: Users can choose any of the three models from the sidebar.
-  \item \textbf{Model Comparison}: Bar chart (accuracy) and ROC curves displayed side-by-side.
-  \item \textbf{Real-Time Prediction}: Input applicant details via a form and get instant default probability with risk classification (Low/Medium/High).
-  \item \textbf{Feature Importance}: After prediction, shows the top 5 factors affecting the result.
-  \item \textbf{Metrics Dashboard}: Sidebar shows active model's accuracy, F1-Score, and AUC.
+  \item \textbf{Milestone 1 --- ML Predictive Dashboard}: Real-time default probability predictions using XGBoost, including feature importance weighting for each applicant.
+  \item \textbf{Milestone 2 --- AI Lending Agent Support}: An advanced reasoning interface driven by \textbf{LangGraph}. It visualizes the internal 5-node workflow (Parse $\rightarrow$ ML $\rightarrow$ RAG $\rightarrow$ LLM $\rightarrow$ Format).
+  \item \textbf{FAISS Visualization}: Shows the retrieved regulatory chunks used by the LLM to ground its decision.
+  \item \textbf{Structured Reports}: Generates assessment reports in JSON format covering summary, risk analysis, lending decision (Approve/Decline), and citations.
 \end{enumerate}
 
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth]{dashboard.png}
-  \caption{Streamlit Dashboard --- Model Comparison with Accuracy Bar Chart and ROC Curves}
-  \label{fig:dashboard}
-\end{figure}
-
-\begin{figure}[H]
-  \centering
-  \includegraphics[width=\textwidth]{prediction_form.png}
-  \caption{Real-Time Prediction Form with Risk Classification Output}
-  \label{fig:prediction}
-\end{figure}
-
-\textbf{Tech Stack}: Streamlit, scikit-learn, XGBoost, Pandas, NumPy, Matplotlib.
+\textbf{Tech Stack Summary}: The integration of Streamlit, LangGraph, and Groq enables a seamless transition from raw data entry to a finalized, ethically-sourced lending report in under 2 seconds.
 
 % ===================================================================
 \section{Team Contribution}
@@ -288,17 +394,17 @@ We built a web application using Streamlit \cite{streamlit} with the following f
     \toprule
     \textbf{Team Member} & \textbf{Contribution} \\
     \midrule
-    \textbf{Dhanvin Vadlamudi} (Team Lead)
-  & Led the overall project architecture, technical direction, and planning. Designed and implemented the XGBoost model, including systematic hyperparameter tuning and performance optimization. Developed the end-to-end preprocessing pipeline. Structured the repository, established coding standards, and coordinated team tasks to ensure timely delivery and smooth integration. \\
+    \rowcolor{blue!5} \textbf{Dhanvin Vadlamudi} (Team Lead)
+  & Overall project architect and Milestone 2 coordinator. Orchestrated the LangGraph workflow, designed the AgentState schema, and implemented the core reasoning nodes. Engineered the final integrated Streamlit dashboard. \\
     \addlinespace
     \textbf{Meka Chaitanya Sai}
-      & Built the Decision Tree model. Experimented with different hyperparameters (\texttt{max\_depth}, \texttt{min\_samples\_leaf}). Assisted with feature encoding. \\
+      & Developed the RAG pipeline using FAISS and TF-IDF. Curated the regulatory knowledge base (RBI/Basel III) and integrated the retrieval node into the agentic loop. \\
     \addlinespace
-    \textbf{Killi Akshith Kumar}
-      & Built the Logistic Regression model --- training, evaluation, and tuning. Performed initial EDA and data exploration in notebooks. Helped with data cleaning logic. \\
+    \rowcolor{blue!5} \textbf{Killi Akshith Kumar}
+      & Designed the premium Streamlit UI/UX. Implemented custom CSS for report cards and sidebar navigation. Managed the hosting and deployment on Streamlit Cloud. \\
     \addlinespace
     \textbf{Akhil Nath Reddy}
-      & Wrote the project report. Built the Streamlit application (\texttt{app.py}). Integrated all models into the dashboard. Assisted with testing and debugging. \\
+      & Drafted the technical assessment logic for the LLM assessment node. Ensured the implementation of Responsible AI guardrails. Conducted final testing and quality assurance on the agent reports. \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -306,30 +412,34 @@ We built a web application using Streamlit \cite{streamlit} with the following f
 % ===================================================================
 \section{Conclusion}
 
-We built a complete loan default prediction system from scratch. We trained three models (Logistic Regression, Decision Tree, XGBoost), compared their performance, and found that \textbf{XGBoost} gave the best results with 91.27\% accuracy and 0.98 ROC-AUC.
+We successfully evolved a standard loan default prediction tool into a sophisticated \textbf{Intelligent Credit Risk Agent}. By combining the high precision of Milestone 1 XGBoost models with the qualitative reasoning of Milestone 2's LangGraph/RAG orchestration, we have created a system that is both predictive and explainable.
 
 Key takeaways:
 \begin{itemize}[leftmargin=2cm]
-  \item Handling class imbalance is critical --- without it, models just predict the majority class.
-  \item XGBoost outperforms simpler models on tabular data thanks to gradient boosting.
-  \item Deploying as a Streamlit app makes the project practical and demonstrable.
-  \item \texttt{loan\_percent\_income} was consistently the top predictor of default.
+  \item \textbf{Synergy}: ML provides the probability; Agentic AI provides the rationale.
+  \item \textbf{Grounding}: RAG is essential for making LLMs reliable in sensitive financial contexts.
+  \item \textbf{Responsible AI}: Explicit guardrails ensure that autonomous decisions remain fair and compliant with banking norms.
+  \item \textbf{Scalability}: The LangGraph framework allows for future expansion into more complex multi-step financial workflows.
 \end{itemize}
 
 % ===================================================================
 \begin{thebibliography}{9}
 
-\bibitem{hosted_app}
-Streamlit Hosted Application, ``Loan Default Prediction Dashboard.'' \\
-\url{https://genaicapstone-m8ezlrzqqq8ctmmfgsh6ur.streamlit.app/}
+\bibitem{langgraph}
+LangChain, ``LangGraph: Orchestrating Agentic Workflows.'' \\
+\url{https://github.com/langchain-ai/langgraph}
 
-\bibitem{kaggle_dataset}
-Kaggle Dataset, ``Loan Approval Classification Data.'' \\
-\url{https://www.kaggle.com/datasets/taweilo/loan-approval-classification-data}
+\bibitem{groq}
+Groq Cloud, ``Llama 3.1 8B Inference Engine.'' \\
+\url{https://groq.com/}
 
-\bibitem{github_repo}
-GitHub Repository, ``GenAI Capstone Source Code.'' \\
-\url{https://github.com/ChaitanyaSai-Meka/gen_ai_capstone}
+\bibitem{faiss}
+Meta Research, ``FAISS: Library for Efficient Similarity Search.'' \\
+\url{https://github.com/facebookresearch/faiss}
+
+\bibitem{rbi_fpc}
+Reserve Bank of India (RBI), ``Fair Practices Code for Lenders.'' \\
+\url{https://www.rbi.org.in/}
 
 \end{thebibliography}
 

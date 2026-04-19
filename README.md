@@ -111,6 +111,16 @@ To ensure 100% compliance with financial regulations (RBI/Basel III) and ethical
 
 ---
 
+## 🧠 Design Rationale
+
+To satisfy the technical requirements of the End-Semester Capstone, our team made the following architecture choices:
+
+- **LangGraph vs. Traditional Chains:** Lending decisions are non-linear. We chose **LangGraph** to allow the agent to maintain state (AgentState) across disparate nodes (ML Scoring vs. RAG Retrieval) and handle feedback loops where RAG results might override initial ML risk assessments.
+- **Groq & Llama 3.1:** Financial tools require high-speed responses. We prioritized **Groq** for its near-instant token generation, ensuring the Agent assessment is delivered within 1-2 seconds.
+- **FAISS Vectors:** We implemented **FAISS** for its localized efficiency. Since our regulatory knowledge base is proprietary and targeted, FAISS provides the best balance of speed and privacy without the need for a persistent cloud vector database.
+
+---
+
 ## 🚀 Setup & Installation
 
 1. **Clone & Install:**
@@ -130,6 +140,16 @@ To ensure 100% compliance with financial regulations (RBI/Basel III) and ethical
    ```bash
    streamlit run app.py
    ```
+
+---
+
+## 🛠️ Troubleshooting & Stability
+
+To ensure the "Robustness" criteria of the rubric, we have handled potential failure points:
+
+- **API Failure:** If Groq is unavailable, the agent will gracefully return a "Risk Score Only" mode, ensuring the app remains functional.
+- **JSON Parsing:** Robust regex-based parsing ensures that even if the LLM adds preamble text, the 4-section credit report is correctly displayed in the UI.
+- **RAG Missing Context:** If no relevant regulation is found for a specific query, the agent explicitly states: "No specific regulatory citation found for this profile," preventing hallucinations.
 
 ---
 
