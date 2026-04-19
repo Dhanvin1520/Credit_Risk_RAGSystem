@@ -14,6 +14,13 @@ _retriever_instance = None
 
 
 def _get_retriever() -> RegulationRetriever:
+    """
+    Singleton pattern for the RegulationRetriever to ensure expensive FAISS 
+    index loading happens only once per session.
+    
+    Returns:
+        RegulationRetriever: An initialized retriever instance.
+    """
     global _retriever_instance
     if _retriever_instance is None:
         _retriever_instance = RegulationRetriever()
@@ -21,6 +28,13 @@ def _get_retriever() -> RegulationRetriever:
 
 
 def _get_api_key() -> str:
+    """
+    Unified API key retriever that prioritized Streamlit secrets for 
+    production and local .env files for development.
+    
+    Returns:
+        str: The Groq API key or an empty string if not found.
+    """
     try:
         import streamlit as st
         key = st.secrets.get("GROQ_API_KEY", "")
@@ -32,6 +46,16 @@ def _get_api_key() -> str:
 
 
 def parse_borrower_node(state: AgentState) -> AgentState:
+    """
+    Validation node that ensures all mandatory borrower features are present 
+    before downstream inference begins.
+    
+    Args:
+        state (AgentState): The current graph state.
+        
+    Returns:
+        AgentState: Updated state with validation error if fields are missing.
+    """
     profile = state.get("borrower_profile", {})
     required = [
         "age", "income", "loan_amount", "loan_intent", "credit_score",
@@ -45,18 +69,32 @@ def parse_borrower_node(state: AgentState) -> AgentState:
 
 
 def ml_scoring_node(state: AgentState, lr_result, dt_result, xgb_result) -> AgentState:
+    """
+    Multi-model inference node that calculates default probabilities across 
+    Logistic Regression, Decision Trees, and XGBoost to ensure cross-model consensus.
+    
+    Args:
+        state (AgentState): Current graph state.
+        lr_result/dt_result/xgb_result: Pre-loaded models and metadata from app.py.
+        
+    Returns:
+        AgentState: State updated with the 'ml_scores' dictionary for downstream reasoning.
+    """
     if state.get("error"):
         return state
 
+    # Extract models and features from session-loaded artifacts
     profile = state["borrower_profile"]
     lr_model, lr_scaler, lr_features = lr_result[0], lr_result[1], lr_result[2]
     dt_model, dt_features = dt_result[0], dt_result[1]
     xgb_model, xgb_features = xgb_result[0], xgb_result[1]
 
+    # Map categorical inputs for numerical inference
     gender_val = 1 if str(profile.get("gender", "")).lower() == "male" else 0
     default_val = 1 if str(profile.get("previous_defaults", "")).lower() == "yes" else 0
     loan_percent = profile["loan_amount"] / max(1, profile["income"])
 
+    # Build input DataFrame
     input_df = pd.DataFrame({
         "person_age": [profile["age"]],
         "person_gender": [gender_val],
@@ -73,6 +111,7 @@ def ml_scoring_node(state: AgentState, lr_result, dt_result, xgb_result) -> Agen
         "previous_loan_defaults_on_file": [default_val]
     })
 
+    # Preprocess and Align Features
     input_processed = preprocess_features(input_df)
     scores = {}
 
@@ -91,19 +130,7 @@ def ml_scoring_node(state: AgentState, lr_result, dt_result, xgb_result) -> Agen
         prob = model.predict_proba(inp)[0][1]
         scores[name] = round(prob * 100, 2)
 
-    xgb_inp = input_processed.copy()
-    for col in xgb_features:
-        if col not in xgb_inp.columns:
-            xgb_inp[col] = 0
-    xgb_inp = xgb_inp[xgb_features]
-
-    importances = xgb_model.feature_importances_
-    feat_imp = sorted(zip(xgb_features, importances), key=lambda x: x[1], reverse=True)
-    risk_drivers = [
-        f.replace("person_", "").replace("loan_", "").replace("_", " ").title()
-        for f, _ in feat_imp[:5]
-    ]
-
+    # Risk Classification Logic
     xgb_prob = scores["XGBoost"] / 100
     if xgb_prob >= 0.60:
         risk_class = "High Risk"
@@ -111,6 +138,14 @@ def ml_scoring_node(state: AgentState, lr_result, dt_result, xgb_result) -> Agen
         risk_class = "Medium Risk"
     else:
         risk_class = "Low Risk"
+
+    # Identify top risk drivers using XGBoost feature importance
+    importances = xgb_model.feature_importances_
+    feat_imp = sorted(zip(xgb_features, importances), key=lambda x: x[1], reverse=True)
+    risk_drivers = [
+        f.replace("person_", "").replace("loan_", "").replace("_", " ").title()
+        for f, _ in feat_imp[:5]
+    ]
 
     ml_scores = {
         "model_probabilities": scores,
@@ -121,12 +156,23 @@ def ml_scoring_node(state: AgentState, lr_result, dt_result, xgb_result) -> Agen
 
 
 def rag_retrieval_node(state: AgentState) -> AgentState:
+    """
+    RAG (Retrieval-Augmented Generation) node that queries a FAISS vector 
+    store to find regulatory guidelines (RBI/Basel III) relevant to the borrower profile.
+    
+    Args:
+        state (AgentState): Current graph state.
+        
+    Returns:
+        AgentState: State updated with 'rag_context' containing semantically relevant regulations.
+    """
     if state.get("error"):
         return state
 
     profile = state["borrower_profile"]
     ml_scores = state["ml_scores"]
 
+    # Construct a high-intent semantic query
     query = (
         f"credit risk {ml_scores['risk_class']} borrower loan amount "
         f"{profile['loan_amount']} income {profile['income']} "
@@ -140,6 +186,16 @@ def rag_retrieval_node(state: AgentState) -> AgentState:
 
 
 def llm_assessment_node(state: AgentState) -> AgentState:
+    """
+    Core reasoning node that uses Llama 3.1 to synthesize ML risk scores and 
+    regulatory guidelines into a structured, bias-free human-readable report.
+    
+    Args:
+        state (AgentState): Current graph state.
+        
+    Returns:
+        AgentState: Final state updated with the structured 'assessment_report' JSON.
+    """
     if state.get("error"):
         return state
 
@@ -150,6 +206,7 @@ def llm_assessment_node(state: AgentState) -> AgentState:
     risk_drivers = state["risk_drivers"]
     rag_context = state["rag_context"]
 
+    # Combine retrieved regulatory text for grounding
     reg_text = "\n\n".join([
         f"[Source: {r['source']}]\n{r['text']}" for r in rag_context
     ])
@@ -158,47 +215,34 @@ def llm_assessment_node(state: AgentState) -> AgentState:
         "You are a credit risk assessment AI assistant for a regulated financial institution. "
         "Generate structured lending assessment reports based on ML model outputs and regulatory guidelines.\n\n"
         "MANDATORY RULES:\n"
-        "1. Base ALL risk decisions ONLY on objective financial metrics: credit score, income, "
-        "loan amount, employment history, debt-to-income ratio, and payment history.\n"
+        "1. Base ALL risk decisions ONLY on objective financial metrics.\n"
         "2. NEVER consider or mention gender, religion, caste, ethnicity, or any protected attribute.\n"
         "3. Cite ONLY sources explicitly given in the regulatory context below.\n"
-        "4. When data is ambiguous or contradictory, explicitly state the uncertainty.\n"
-        "5. Always include the legal disclaimer.\n"
-        "6. Return ONLY valid JSON with no markdown fences, no extra text before or after.\n\n"
+        "4. Return ONLY valid JSON with no markdown fences or extra text.\n\n"
         'Return this exact JSON structure:\n'
         '{\n'
-        '  "borrower_summary": "2-3 sentence summary of the borrower financial profile",\n'
-        '  "risk_analysis": "3-4 sentence analysis of key risk drivers and their implications",\n'
-        '  "lending_decision": "APPROVE or CONDITIONAL APPROVE or DECLINE",\n'
-        '  "decision_rationale": "2-3 sentence justification based solely on financial data",\n'
-        '  "conditions": ["list conditions if CONDITIONAL APPROVE, else empty list"],\n'
-        '  "regulatory_references": ["2-3 specific citations from provided regulatory context"],\n'
-        '  "responsible_ai_note": "1 sentence on fair lending adherence",\n'
-        '  "disclaimer": "Legal disclaimer for AI-generated credit assessments"\n'
+        '  "borrower_summary": "Summary of financial profile",\n'
+        '  "risk_analysis": "Analysis of risk drivers",\n'
+        '  "lending_decision": "APPROVE/CONDITIONAL/DECLINE",\n'
+        '  "decision_rationale": "Justification based on data",\n'
+        '  "conditions": ["List of conditions if applicable"],\n'
+        '  "regulatory_references": ["Citations from context"],\n'
+        '  "responsible_ai_note": "Note on fair lending",\n'
+        '  "disclaimer": "Legal disclaimer"\n'
         '}'
     )
 
     user_message = (
         f"BORROWER FINANCIAL PROFILE:\n"
-        f"- Annual Income: ${profile['income']:,}\n"
-        f"- Loan Amount Requested: ${profile['loan_amount']:,}\n"
-        f"- Loan-to-Income Ratio: {profile['loan_amount'] / max(1, profile['income']):.2%}\n"
-        f"- Credit Score: {profile['credit_score']}\n"
-        f"- Employment Experience: {profile['employment_years']} years\n"
-        f"- Home Ownership: {profile['home_ownership']}\n"
-        f"- Loan Purpose: {profile['loan_intent']}\n"
-        f"- Interest Rate: {profile['interest_rate']}%\n"
-        f"- Credit History Length: {profile['credit_history_years']} years\n"
-        f"- Previous Loan Defaults: {profile['previous_defaults']}\n"
-        f"- Education Level: {profile['education']}\n\n"
-        f"ML MODEL ASSESSMENT:\n"
-        f"- XGBoost Default Probability: {ml_scores['consensus_default_probability']}%\n"
-        f"- Logistic Regression Probability: {ml_scores['model_probabilities']['Logistic Regression']}%\n"
-        f"- Decision Tree Probability: {ml_scores['model_probabilities']['Decision Tree']}%\n"
-        f"- Consensus Risk Classification: {ml_scores['risk_class']}\n"
-        f"- Top Risk Drivers: {', '.join(risk_drivers)}\n\n"
+        f"- Income: ${profile['income']:,} | Loan: ${profile['loan_amount']:,}\n"
+        f"- Credit Score: {profile['credit_score']} | Experience: {profile['employment_years']}y\n"
+        f"- Credit History: {profile['credit_history_years']}y | Previous Defaults: {profile['previous_defaults']}\n\n"
+        f"ML ASSESSMENT:\n"
+        f"- XGBoost Probability: {ml_scores['consensus_default_probability']}%\n"
+        f"- Consensus Risk Class: {ml_scores['risk_class']}\n"
+        f"- Risk Drivers: {', '.join(risk_drivers)}\n\n"
         f"REGULATORY CONTEXT:\n{reg_text}\n\n"
-        "Generate the structured credit assessment report as JSON."
+        "Generate the structured credit report as pure JSON."
     )
 
     api_key = _get_api_key()
@@ -216,6 +260,7 @@ def llm_assessment_node(state: AgentState) -> AgentState:
 
     raw_output = response.choices[0].message.content.strip()
 
+    # Robust JSON parsing to handle various LLM formatting behaviors
     try:
         report = json.loads(raw_output)
     except json.JSONDecodeError:
