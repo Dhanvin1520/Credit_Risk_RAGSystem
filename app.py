@@ -568,12 +568,8 @@ def _render_agent_page():
             key="m2_agent_btn"
         )
 
-    st.markdown("---")
-    st.subheader("Milestone 2 Architecture Overview")
-    st.image("assets/milestone2_architecture_detailed.png", use_container_width=True)
-
     if generate:
-        st.session_state.last_agent_run = None # Clear previous
+        st.session_state.last_agent_run = None 
         borrower_profile = {
             "age": age,
             "gender": gender,
