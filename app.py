@@ -825,7 +825,7 @@ def _render_report_page():
     st.title("Project Report")
     st.link_button(
         "View Report on Google Drive",
-        "https://drive.google.com/file/d/1bKLeRReufK8u5oOO0q1BsBgFlvWmdSO2/view?usp=sharing",
+        "https://drive.google.com/file/d/1SO0Pme8BG06E0wikFb77NZ8G2HPcwc49/view?usp=sharing",
         use_container_width=True
     )
     st.markdown("Below is the formal project report detailing our approach and methodology.")
